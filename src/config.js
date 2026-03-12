@@ -13,10 +13,9 @@ module.exports = {
 
   email: {
     to: process.env.NOTIFY_EMAIL || 'rdsioson@gmail.com',
-    smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
-    smtpPort: parseInt(process.env.SMTP_PORT || '587', 10),
-    smtpUser: process.env.SMTP_USER || '',
-    smtpPass: process.env.SMTP_PASS || '',
+    from: 'homer-oclw@agentmail.to',
+    agentMailInboxId: 'homer-oclw@agentmail.to',
+    agentMailApiKey: 'am_us_5f1ff6e8ff594a5efde51a287b29401e710a355136d8e1e6e55da3549ca9f9d4',
   },
 
   timing: {

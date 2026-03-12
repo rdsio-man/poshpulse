@@ -1,30 +1,53 @@
 /**
- * mailer.js — Email notifications via Nodemailer (Gmail SMTP).
+ * mailer.js — Email notifications via AgentMail API.
  *
  * Two types of emails:
  *   1. Daily digest — sent once per day summarizing all relist actions
  *   2. Captcha alert — immediate alert when a captcha is detected
  */
 
-const nodemailer = require('nodemailer');
+const https = require('https');
 const config = require('../config');
 
-let _transporter = null;
+/**
+ * Send an email via AgentMail REST API.
+ */
+function sendEmail({ to, subject, html }) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      to: [to],
+      subject,
+      html,
+    });
 
-function getTransporter() {
-  if (_transporter) return _transporter;
+    const inboxId = encodeURIComponent(config.email.agentMailInboxId);
+    const options = {
+      hostname: 'api.agentmail.to',
+      path: `/v0/inboxes/${inboxId}/messages/send`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.email.agentMailApiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    };
 
-  _transporter = nodemailer.createTransport({
-    host: config.email.smtpHost,
-    port: config.email.smtpPort,
-    secure: false,
-    auth: {
-      user: config.email.smtpUser,
-      pass: config.email.smtpPass,
-    },
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(data);
+        } else {
+          reject(new Error(`AgentMail error ${res.statusCode}: ${data}`));
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(body);
+    req.end();
   });
-
-  return _transporter;
 }
 
 /**
@@ -33,11 +56,6 @@ function getTransporter() {
  * @param {Array<{ title: string, timestamp: string, success: boolean }>} relistLog
  */
 async function sendDailyDigest(relistLog) {
-  if (!config.email.smtpUser || !config.email.smtpPass) {
-    console.warn('[mailer] SMTP not configured — skipping daily digest');
-    return;
-  }
-
   const date = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     timeZone: 'America/Los_Angeles',
@@ -74,12 +92,11 @@ async function sendDailyDigest(relistLog) {
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <p style="color:#aaa; font-size:12px; margin-top:24px;">Sent by PoshPulse 🤖</p>
+      <p style="color:#aaa; font-size:12px; margin-top:24px;">Sent by PoshPulse 🤖 via homer-oclw@agentmail.to</p>
     </div>
   `;
 
-  await getTransporter().sendMail({
-    from: `"PoshPulse" <${config.email.smtpUser}>`,
+  await sendEmail({
     to: config.email.to,
     subject: `PoshPulse Digest — ${successful.length} relists on ${date}`,
     html,
@@ -94,11 +111,6 @@ async function sendDailyDigest(relistLog) {
  * @param {string} context  Where the captcha was detected (e.g. "login", "share")
  */
 async function sendCaptchaAlert(context) {
-  if (!config.email.smtpUser || !config.email.smtpPass) {
-    console.warn('[mailer] SMTP not configured — skipping captcha alert');
-    return;
-  }
-
   const timestamp = new Date().toLocaleString('en-US', {
     timeZone: 'America/Los_Angeles',
     dateStyle: 'full',
@@ -111,12 +123,11 @@ async function sendCaptchaAlert(context) {
       <p><strong>Time:</strong> ${timestamp} (PT)</p>
       <p><strong>Where:</strong> ${context}</p>
       <p>PoshPulse has paused automation. Manual intervention may be required to solve the CAPTCHA and resume.</p>
-      <p style="color:#aaa; font-size:12px; margin-top:24px;">Sent by PoshPulse 🤖</p>
+      <p style="color:#aaa; font-size:12px; margin-top:24px;">Sent by PoshPulse 🤖 via homer-oclw@agentmail.to</p>
     </div>
   `;
 
-  await getTransporter().sendMail({
-    from: `"PoshPulse" <${config.email.smtpUser}>`,
+  await sendEmail({
     to: config.email.to,
     subject: `⚠️ PoshPulse CAPTCHA Alert — ${timestamp}`,
     html,
