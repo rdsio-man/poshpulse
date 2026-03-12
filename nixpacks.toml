@@ -1,0 +1,44 @@
+# nixpacks.toml — Railway build config for PoshPulse
+
+[phases.setup]
+nixPkgs = [
+  "nodejs_20",
+  "chromium",
+  "nss",
+  "nspr",
+  "atk",
+  "cups",
+  "dbus",
+  "expat",
+  "libdrm",
+  "libxkbcommon",
+  "mesa",
+  "xorg.libX11",
+  "xorg.libXcomposite",
+  "xorg.libXdamage",
+  "xorg.libXext",
+  "xorg.libXfixes",
+  "xorg.libXrandr",
+  "xorg.libxcb",
+  "xorg.libXcursor",
+  "xorg.libXi",
+  "xorg.libXtst",
+  "pango",
+  "cairo",
+  "glib",
+  "gtk3",
+  "alsa-lib",
+  "at-spi2-atk",
+  "at-spi2-core",
+]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = [
+  "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 echo 'Using system Chromium'"
+]
+
+[start]
+cmd = "node src/index.js"

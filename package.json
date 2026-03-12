@@ -1,0 +1,15 @@
+{
+  "name": "poshpulse",
+  "version": "1.0.0",
+  "description": "Automated Poshmark listing refresh and sharing bot",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "nodemailer": "^6.9.13",
+    "playwright": "^1.42.1"
+  }
+}
