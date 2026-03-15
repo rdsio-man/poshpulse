@@ -156,9 +156,14 @@ async function shareListing(page, listing) {
 // ── Relist a listing ───────────────────────────────────────────────────────────
 
 /**
- * Open a listing's edit page, delete it, then re-create it (relist).
- * NOTE: The exact UI flow will be confirmed once credentials are provided
- * and we can observe the actual Poshmark interface.
+ * Relist a listing on Poshmark.
+ *
+ * Strategy (tried in order):
+ *  1. Direct "Relist" button visible on the listing page (seller view).
+ *  2. Open the ⋮ / more-actions dropdown, then click "Relist" inside it.
+ *  3. Navigate to the edit page and look for a Relist option there.
+ *
+ * Each path handles a confirmation modal if one appears.
  *
  * @param {import('playwright').Page} page
  * @param {{ listingUrl: string, title: string, id: string }} listing
@@ -166,55 +171,93 @@ async function shareListing(page, listing) {
  */
 async function relistListing(page, listing) {
   try {
-    // Navigate to the listing page
     await page.goto(listing.listingUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
     await sleep(1500 + Math.random() * 1000);
 
-    // Click the edit/more options button (⋮ or Edit)
-    const editBtn = await page.$('[data-et-name="edit_listing"]') ||
-                    await page.$('button[aria-label*="edit" i]') ||
-                    await page.$('a[href*="/edit"]');
+    // ── Strategy 1: direct Relist button on the listing page ──────────────────
+    const directRelistBtn =
+      await page.$('[data-et-name="relist_listing"]') ||
+      await page.$('button:has-text("Relist")') ||
+      await page.$('a:has-text("Relist")');
 
-    if (!editBtn) {
-      console.warn(`[poshmark] Edit button not found for: ${listing.title}`);
-      return false;
+    if (directRelistBtn) {
+      await directRelistBtn.click();
+      await sleep(1000 + Math.random() * 500);
+      await confirmRelistModal(page);
+      console.log(`[poshmark] Relisted (direct): ${listing.title}`);
+      return true;
     }
 
-    await editBtn.click();
-    await sleep(1500 + Math.random() * 500);
+    // ── Strategy 2: ⋮ / more-actions dropdown ─────────────────────────────────
+    const moreBtn =
+      await page.$('[data-et-name="more_actions"]') ||
+      await page.$('button[aria-label*="more" i]') ||
+      await page.$('[class*="more-actions"]') ||
+      await page.$('button[aria-label*="options" i]');
 
-    // On the edit page, look for "Delete" option
-    const deleteBtn = await page.$('[data-et-name="delete_listing"]') ||
-                      await page.$('button:has-text("Delete")') ||
-                      await page.$('[class*="delete"]');
+    if (moreBtn) {
+      await moreBtn.click();
+      await sleep(800 + Math.random() * 400);
 
-    if (!deleteBtn) {
-      console.warn(`[poshmark] Delete button not found for: ${listing.title}`);
-      return false;
+      const dropdownRelist = await page.waitForSelector(
+        'button:has-text("Relist"), [data-et-name="relist"], a:has-text("Relist")',
+        { timeout: 3000 }
+      ).catch(() => null);
+
+      if (dropdownRelist) {
+        await dropdownRelist.click();
+        await sleep(1000 + Math.random() * 500);
+        await confirmRelistModal(page);
+        console.log(`[poshmark] Relisted (dropdown): ${listing.title}`);
+        return true;
+      }
     }
 
-    await deleteBtn.click();
-    await sleep(1000 + Math.random() * 500);
+    // ── Strategy 3: edit page ──────────────────────────────────────────────────
+    const editBtn =
+      await page.$('[data-et-name="edit_listing"]') ||
+      await page.$('button[aria-label*="edit" i]') ||
+      await page.$('a[href*="/edit"]');
 
-    // Confirm delete in the modal
-    const confirmBtn = await page.waitForSelector(
-      'button:has-text("Yes"), button:has-text("Delete"), [data-et-name="confirm_delete"]',
-      { timeout: 5000 }
-    ).catch(() => null);
+    if (editBtn) {
+      await editBtn.click();
+      await sleep(1500 + Math.random() * 500);
 
-    if (confirmBtn) {
-      await confirmBtn.click();
-      await sleep(2000 + Math.random() * 1000);
+      const editPageRelist = await page.waitForSelector(
+        'button:has-text("Relist"), [data-et-name="relist"]',
+        { timeout: 3000 }
+      ).catch(() => null);
+
+      if (editPageRelist) {
+        await editPageRelist.click();
+        await sleep(1000 + Math.random() * 500);
+        await confirmRelistModal(page);
+        console.log(`[poshmark] Relisted (edit page): ${listing.title}`);
+        return true;
+      }
     }
 
-    // TODO: Re-list logic — after deletion, Poshmark may offer a "Relist" button
-    // or we navigate to create a new listing with the same data.
-    // This will be refined once we can observe the actual UI flow.
-    console.log(`[poshmark] Relisted: ${listing.title}`);
-    return true;
+    console.warn(`[poshmark] No Relist option found for: ${listing.title}`);
+    return false;
   } catch (err) {
     console.warn(`[poshmark] Relist failed for "${listing.title}": ${err.message}`);
     return false;
+  }
+}
+
+/**
+ * Click the confirmation button in a Relist modal, if one appears.
+ * @param {import('playwright').Page} page
+ */
+async function confirmRelistModal(page) {
+  const confirmBtn = await page.waitForSelector(
+    'button:has-text("Yes"), button:has-text("Relist"), button:has-text("Confirm"), [data-et-name="confirm_relist"]',
+    { timeout: 5000 }
+  ).catch(() => null);
+
+  if (confirmBtn) {
+    await confirmBtn.click();
+    await sleep(2000 + Math.random() * 1000);
   }
 }
 
@@ -233,4 +276,4 @@ async function hasCaptcha(page) {
          bodyText.toLowerCase().includes("i'm not a robot");
 }
 
-module.exports = { login, getActiveListings, shareListing, relistListing, hasCaptcha };
+module.exports = { login, getActiveListings, shareListing, relistListing, hasCaptcha, confirmRelistModal };

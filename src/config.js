@@ -12,10 +12,10 @@ module.exports = {
   },
 
   email: {
-    to: process.env.NOTIFY_EMAIL || 'rdsioson@gmail.com',
-    from: 'homer-oclw@agentmail.to',
-    agentMailInboxId: 'homer-oclw@agentmail.to',
-    agentMailApiKey: 'am_us_5f1ff6e8ff594a5efde51a287b29401e710a355136d8e1e6e55da3549ca9f9d4',
+    to: process.env.NOTIFY_EMAIL || '',
+    from: process.env.AGENTMAIL_FROM || '',
+    agentMailInboxId: process.env.AGENTMAIL_INBOX_ID || '',
+    agentMailApiKey: process.env.AGENTMAIL_API_KEY || '',
   },
 
   timing: {

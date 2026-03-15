@@ -92,7 +92,7 @@ async function sendDailyDigest(relistLog) {
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <p style="color:#aaa; font-size:12px; margin-top:24px;">Sent by PoshPulse 🤖 via homer-oclw@agentmail.to</p>
+      <p style="color:#aaa; font-size:12px; margin-top:24px;">Sent by PoshPulse 🤖 via ${config.email.from}</p>
     </div>
   `;
 
@@ -123,7 +123,7 @@ async function sendCaptchaAlert(context) {
       <p><strong>Time:</strong> ${timestamp} (PT)</p>
       <p><strong>Where:</strong> ${context}</p>
       <p>PoshPulse has paused automation. Manual intervention may be required to solve the CAPTCHA and resume.</p>
-      <p style="color:#aaa; font-size:12px; margin-top:24px;">Sent by PoshPulse 🤖 via homer-oclw@agentmail.to</p>
+      <p style="color:#aaa; font-size:12px; margin-top:24px;">Sent by PoshPulse 🤖 via ${config.email.from}</p>
     </div>
   `;
 
