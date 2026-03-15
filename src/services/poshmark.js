@@ -22,6 +22,12 @@ function jitter(base, spreadMs = 5000) {
   return sleep(base + Math.floor(Math.random() * spreadMs));
 }
 
+const fs = require('fs');
+const path = require('path');
+
+// File dropped by the one-time setup tool when user enters their 2FA code
+const VERIFY_CODE_FILE = path.join(__dirname, '../../.session/verify-code.txt');
+
 // ── Login ──────────────────────────────────────────────────────────────────────
 
 /**
@@ -43,13 +49,53 @@ async function login(page, username, password) {
 
   await page.fill('input[id="login_form_username_email"]', username);
   await sleep(800 + Math.random() * 400);
-  await page.fill('input[id="login_form_pw"]', password);
+  await page.fill('input[id="login_form_password"]', password);
   await sleep(600 + Math.random() * 400);
   await page.click('button[type="submit"]');
+  await sleep(3000 + Math.random() * 1000);
+
+  // Poshmark may require email verification on new devices
+  const currentUrl = page.url();
+  const bodyText = await page.evaluate(() => document.body?.innerText || '').catch(() => '');
+  if (currentUrl.includes('/login') && bodyText.toLowerCase().includes('verification code')) {
+    console.log('[poshmark] Email verification required — check your email for the code');
+    const code = await waitForVerificationCode(page);
+    if (!code) throw new Error('Email verification code not entered in time');
+  }
 
   // Wait for redirect to feed or closet
-  await page.waitForURL(/\/(feed|closet)/, { timeout: 20000 });
+  await page.waitForURL(/\/(feed|closet)/, { timeout: 30000 });
   console.log('[poshmark] Login successful');
+}
+
+/**
+ * Wait up to 5 minutes for the user to drop a verification code into
+ * .session/verify-code.txt, then type it into the page and submit.
+ */
+async function waitForVerificationCode(page) {
+  console.log('[poshmark] Waiting for verification code in .session/verify-code.txt ...');
+  const deadline = Date.now() + 5 * 60 * 1000;
+
+  while (Date.now() < deadline) {
+    if (fs.existsSync(VERIFY_CODE_FILE)) {
+      const code = fs.readFileSync(VERIFY_CODE_FILE, 'utf8').trim();
+      if (code) {
+        fs.unlinkSync(VERIFY_CODE_FILE); // consume it
+        console.log('[poshmark] Code received, submitting...');
+        const codeInput = await page.$('input[name="otp"]').catch(() => null);
+        if (codeInput) {
+          await codeInput.fill(code);
+          await sleep(500);
+          // Click the "Done" button in the OTP modal (data-et-name="submit")
+          await page.click('button[data-et-name="submit"]');
+          await sleep(2000);
+        }
+        return code;
+      }
+    }
+    await sleep(3000);
+  }
+  return null;
 }
 
 // ── Get active listings ────────────────────────────────────────────────────────

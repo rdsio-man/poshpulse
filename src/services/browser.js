@@ -7,6 +7,10 @@
 
 const { chromium } = require('playwright');
 const fs = require('fs');
+const path = require('path');
+
+// Persist browser session to disk so login/2FA is only needed once
+const SESSION_DIR = path.join(__dirname, '../../.session');
 
 function getChromiumExecutable() {
   for (const p of ['/usr/bin/chromium', '/usr/bin/chromium-browser']) {
@@ -54,12 +58,25 @@ async function getContext() {
     ],
   });
 
+  // Use a persistent context so cookies/session are saved across restarts
+  if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, { recursive: true });
+
   _context = await _browser.newContext({
     userAgent: USER_AGENT,
     viewport: { width: 1280, height: 900 },
     locale: 'en-US',
     timezoneId: 'America/Los_Angeles',
     extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
+    storageState: fs.existsSync(path.join(SESSION_DIR, 'state.json'))
+      ? path.join(SESSION_DIR, 'state.json')
+      : undefined,
+  });
+
+  // Save session state after every page navigation
+  _context.on('page', (page) => {
+    page.on('load', () => {
+      _context.storageState({ path: path.join(SESSION_DIR, 'state.json') }).catch(() => {});
+    });
   });
 
   return _context;
